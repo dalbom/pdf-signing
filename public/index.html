@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 도장/서명 삽입</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: #1a73e8;
+      color: white;
+      padding: 16px 24px;
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .header svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Upload area */
+    .upload-section {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .upload-box {
+      flex: 1;
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: white;
+      position: relative;
+    }
+
+    .upload-box:hover {
+      border-color: #1a73e8;
+      background: #f8faff;
+    }
+
+    .upload-box.has-file {
+      border-color: #34a853;
+      background: #f0faf3;
+    }
+
+    .upload-box svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      color: #999;
+    }
+
+    .upload-box.has-file svg {
+      color: #34a853;
+    }
+
+    .upload-box h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #555;
+    }
+
+    .upload-box p {
+      font-size: 13px;
+      color: #999;
+    }
+
+    .upload-box .file-name {
+      font-size: 14px;
+      color: #1a73e8;
+      font-weight: 500;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+
+    .upload-box input[type="file"] {
+      display: none;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      flex-wrap: wrap;
+    }
+
+    .toolbar .page-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar button:hover:not(:disabled) {
+      background: #f0f2f5;
+      border-color: #bbb;
+    }
+
+    .toolbar button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .toolbar .page-info {
+      font-size: 14px;
+      color: #666;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .toolbar .separator {
+      width: 1px;
+      height: 28px;
+      background: #ddd;
+    }
+
+    .stamp-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stamp-controls label {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .stamp-controls input[type="range"] {
+      width: 120px;
+      accent-color: #1a73e8;
+    }
+
+    .stamp-size-label {
+      font-size: 12px;
+      color: #999;
+      min-width: 40px;
+    }
+
+    .btn-save {
+      padding: 8px 24px !important;
+      background: #1a73e8 !important;
+      color: white !important;
+      border: none !important;
+      font-weight: 600 !important;
+      margin-left: auto;
+    }
+
+    .btn-save:hover:not(:disabled) {
+      background: #1557b0 !important;
+    }
+
+    .btn-remove-stamp {
+      background: #ff4444 !important;
+      color: white !important;
+      border: none !important;
+    }
+
+    .btn-remove-stamp:hover:not(:disabled) {
+      background: #cc0000 !important;
+    }
+
+    /* Canvas area */
+    .canvas-container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: center;
+      min-height: 500px;
+      position: relative;
+      overflow: auto;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      display: inline-block;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+
+    #pdfCanvas {
+      display: block;
+    }
+
+    .stamp-overlay {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      -webkit-user-select: none;
+      border: 2px dashed transparent;
+      transition: border-color 0.15s;
+    }
+
+    .stamp-overlay:hover,
+    .stamp-overlay.active {
+      border-color: #1a73e8;
+    }
+
+    .stamp-overlay img {
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .stamp-overlay .resize-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #1a73e8;
+      border: 2px solid white;
+      border-radius: 50%;
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+      display: none;
+    }
+
+    .stamp-overlay:hover .resize-handle,
+    .stamp-overlay.active .resize-handle {
+      display: block;
+    }
+
+    .stamp-overlay .delete-handle {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: #ff4444;
+      border: 2px solid white;
+      border-radius: 50%;
+      top: -10px;
+      right: -10px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: white;
+      line-height: 1;
+    }
+
+    .stamp-overlay:hover .delete-handle,
+    .stamp-overlay.active .delete-handle {
+      display: flex;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      color: #999;
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 16px;
+      opacity: 0.4;
+    }
+
+    .empty-state p {
+      font-size: 16px;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loading-overlay.show {
+      display: flex;
+    }
+
+    .loading-box {
+      background: white;
+      border-radius: 16px;
+      padding: 40px 48px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-box p {
+      font-size: 16px;
+      color: #555;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #333;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: transform 0.3s;
+      z-index: 1001;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .upload-section {
+        flex-direction: column;
+      }
+
+      .toolbar {
+        gap: 8px;
+      }
+
+      .container {
+        padding: 12px;
+      }
+
+      .stamp-controls input[type="range"] {
+        width: 80px;
+      }
+    }
+
+    /* Multi-stamp list */
+    .stamp-list {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: none;
+    }
+
+    .stamp-list.show {
+      display: block;
+    }
+
+    .stamp-list h4 {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .stamp-thumbnails {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .stamp-thumb {
+      width: 60px;
+      height: 60px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+      background: white;
+    }
+
+    .stamp-thumb:hover {
+      border-color: #1a73e8;
+    }
+
+    .stamp-thumb.selected {
+      border-color: #1a73e8;
+      background: #f0f6ff;
+    }
+
+    .stamp-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .stamp-thumb .remove-btn {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 16px;
+      height: 16px;
+      background: #ff4444;
+      color: white;
+      border: 1.5px solid white;
+      border-radius: 50%;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .add-stamp-btn {
+      width: 60px;
+      height: 60px;
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 24px;
+      color: #999;
+      transition: all 0.15s;
+      background: white;
+    }
+
+    .add-stamp-btn:hover {
+      border-color: #1a73e8;
+      color: #1a73e8;
+    }
+
+    /* All pages mode */
+    .apply-mode {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .apply-mode label {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .apply-mode input[type="checkbox"] {
+      accent-color: #1a73e8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/><path d="M9 13h6v2H9zm0 4h6v2H9zm0-8h2v2H9z"/></svg>
+    PDF 도장/서명 삽입
+  </div>
+
+  <div class="container">
+    <!-- Upload Section -->
+    <div class="upload-section">
+      <div class="upload-box" id="pdfUploadBox" onclick="document.getElementById('pdfInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9 15 12 12 15 15"/>
+        </svg>
+        <h3>PDF 파일 업로드</h3>
+        <p>클릭하거나 파일을 끌어다 놓으세요</p>
+        <div class="file-name" id="pdfFileName"></div>
+        <input type="file" id="pdfInput" accept=".pdf">
+      </div>
+
+      <div class="upload-box" id="stampUploadBox" onclick="document.getElementById('stampInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <h3>도장/서명 이미지 업로드</h3>
+        <p>투명 배경 PNG 파일 권장</p>
+        <div class="file-name" id="stampFileName"></div>
+        <input type="file" id="stampInput" accept="image/png,image/jpeg,image/webp">
+      </div>
+    </div>
+
+    <!-- Stamp List -->
+    <div class="stamp-list" id="stampList">
+      <h4>등록된 도장/서명 (클릭하여 선택 후 PDF 위에 클릭하여 배치)</h4>
+      <div class="stamp-thumbnails" id="stampThumbnails">
+        <div class="add-stamp-btn" onclick="document.getElementById('stampInput').click()">+</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar" id="toolbar" style="display:none;">
+      <div class="page-nav">
+        <button id="prevPage" onclick="changePage(-1)">&#9664; 이전</button>
+        <span class="page-info" id="pageInfo">1 / 1</span>
+        <button id="nextPage" onclick="changePage(1)">다음 &#9654;</button>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="stamp-controls">
+        <label>도장 크기:</label>
+        <input type="range" id="stampSize" min="20" max="300" value="100" oninput="updateStampSize(this.value)">
+        <span class="stamp-size-label" id="stampSizeLabel">100px</span>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="apply-mode">
+        <input type="checkbox" id="applyAllPages">
+        <label for="applyAllPages">모든 페이지에 적용</label>
+      </div>
+
+      <button class="btn-save" id="saveBtn" onclick="savePdf()" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        PDF 저장
+      </button>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-container" id="canvasContainer">
+      <div class="empty-state" id="emptyState">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <p>PDF 파일을 업로드하여 시작하세요</p>
+      </div>
+      <div class="canvas-wrapper" id="canvasWrapper" style="display:none;">
+        <canvas id="pdfCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loading">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p id="loadingText">처리 중...</p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // pdf.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // State
+    let pdfDoc = null;
+    let pdfBytes = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let stamps = []; // { id, dataUrl, name }
+    let selectedStampId = null;
+    let placedStamps = {}; // { pageNum: [{ id, stampId, x, y, width, height }] }
+    let stampCounter = 0;
+    let placedCounter = 0;
+    let renderScale = 1.5;
+    let isDraggingOrResizing = false;
+    let pdfPageDimensions = {}; // { pageNum: { width, height } } in PDF points
+
+    // DOM
+    const pdfInput = document.getElementById('pdfInput');
+    const stampInput = document.getElementById('stampInput');
+    const pdfCanvas = document.getElementById('pdfCanvas');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+    const canvasContainer = document.getElementById('canvasContainer');
+    const toolbar = document.getElementById('toolbar');
+    const emptyState = document.getElementById('emptyState');
+    const pageInfo = document.getElementById('pageInfo');
+    const stampSize = document.getElementById('stampSize');
+    const stampSizeLabel = document.getElementById('stampSizeLabel');
+    const saveBtn = document.getElementById('saveBtn');
+    const stampList = document.getElementById('stampList');
+    const stampThumbnails = document.getElementById('stampThumbnails');
+
+    // File Upload: PDF
+    pdfInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      document.getElementById('pdfFileName').textContent = file.name;
+      document.getElementById('pdfUploadBox').classList.add('has-file');
+
+      showLoading('PDF 로딩 중...');
+
+      const arrayBuffer = await file.arrayBuffer();
+      pdfBytes = new Uint8Array(arrayBuffer);
+
+      try {
+        pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
+        totalPages = pdfDoc.numPages;
+        currentPage = 1;
+        placedStamps = {};
+
+        // Cache page dimensions
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdfDoc.getPage(i);
+          const vp = page.getViewport({ scale: 1 });
+          pdfPageDimensions[i] = { width: vp.width, height: vp.height };
+        }
+
+        toolbar.style.display = 'flex';
+        emptyState.style.display = 'none';
+        canvasWrapper.style.display = 'inline-block';
+
+        await renderPage(currentPage);
+        updateSaveBtn();
+        hideLoading();
+        showToast(`PDF 로드 완료 (${totalPages}페이지)`);
+      } catch (err) {
+        hideLoading();
+        showToast('PDF 로드 실패: ' + err.message);
+        console.error(err);
+      }
+    });
+
+    // File Upload: Stamp
+    stampInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const id = ++stampCounter;
+        const stamp = { id, dataUrl: ev.target.result, name: file.name };
+        stamps.push(stamp);
+        selectedStampId = id;
+
+        document.getElementById('stampFileName').textContent = file.name;
+        document.getElementById('stampUploadBox').classList.add('has-file');
+
+        renderStampList();
+        updateSaveBtn();
+        showToast('도장/서명 등록 완료 - PDF 위를 클릭하여 배치하세요');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    // Render stamp thumbnail list
+    function renderStampList() {
+      if (stamps.length === 0) {
+        stampList.classList.remove('show');
+        return;
+      }
+      stampList.classList.add('show');
+
+      // Clear except add button
+      const addBtn = stampThumbnails.querySelector('.add-stamp-btn');
+      stampThumbnails.innerHTML = '';
+
+      stamps.forEach(s => {
+        const thumb = document.createElement('div');
+        thumb.className = 'stamp-thumb' + (s.id === selectedStampId ? ' selected' : '');
+        thumb.innerHTML = `<img src="${s.dataUrl}" alt="${s.name}"><div class="remove-btn" data-id="${s.id}">&times;</div>`;
+        thumb.addEventListener('click', (e) => {
+          if (e.target.classList.contains('remove-btn')) {
+            removeStamp(parseInt(e.target.dataset.id));
+            return;
+          }
+          selectedStampId = s.id;
+          renderStampList();
+        });
+        stampThumbnails.appendChild(thumb);
+      });
+
+      stampThumbnails.appendChild(addBtn || createAddBtn());
+    }
+
+    function createAddBtn() {
+      const btn = document.createElement('div');
+      btn.className = 'add-stamp-btn';
+      btn.textContent = '+';
+      btn.addEventListener('click', () => stampInput.click());
+      return btn;
+    }
+
+    function removeStamp(id) {
+      stamps = stamps.filter(s => s.id !== id);
+      // Remove all placed stamps with this stampId
+      Object.keys(placedStamps).forEach(page => {
+        placedStamps[page] = placedStamps[page].filter(p => p.stampId !== id);
+      });
+      if (selectedStampId === id) {
+        selectedStampId = stamps.length > 0 ? stamps[0].id : null;
+      }
+      renderStampList();
+      renderPlacedStamps();
+      updateSaveBtn();
+    }
+
+    // Render PDF page
+    async function renderPage(num) {
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: renderScale });
+
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
+
+      const ctx = pdfCanvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      pageInfo.textContent = `${num} / ${totalPages}`;
+      document.getElementById('prevPage').disabled = (num <= 1);
+      document.getElementById('nextPage').disabled = (num >= totalPages);
+
+      renderPlacedStamps();
+    }
+
+    function changePage(delta) {
+      const newPage = currentPage + delta;
+      if (newPage < 1 || newPage > totalPages) return;
+      currentPage = newPage;
+      renderPage(currentPage);
+    }
+
+    // Place stamp on canvas click
+    canvasWrapper.addEventListener('click', (e) => {
+      if (isDraggingOrResizing) { isDraggingOrResizing = false; return; }
+      if (e.target.closest('.stamp-overlay')) return;
+      if (!selectedStampId) {
+        showToast('먼저 도장/서명 이미지를 등록하세요');
+        return;
+      }
+
+      const rect = pdfCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const size = parseInt(stampSize.value);
+
+      const stamp = stamps.find(s => s.id === selectedStampId);
+      if (!stamp) return;
+
+      const placed = {
+        id: ++placedCounter,
+        stampId: stamp.id,
+        x: x - size / 2,
+        y: y - size / 2,
+        width: size,
+        height: size
+      };
+
+      if (!placedStamps[currentPage]) placedStamps[currentPage] = [];
+      placedStamps[currentPage].push(placed);
+
+      renderPlacedStamps();
+      updateSaveBtn();
+    });
+
+    // Render placed stamps as overlays
+    function renderPlacedStamps() {
+      // Remove existing overlays
+      canvasWrapper.querySelectorAll('.stamp-overlay').forEach(el => el.remove());
+
+      const pageStamps = placedStamps[currentPage] || [];
+      pageStamps.forEach(ps => {
+        const stamp = stamps.find(s => s.id === ps.stampId);
+        if (!stamp) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'stamp-overlay';
+        overlay.style.left = ps.x + 'px';
+        overlay.style.top = ps.y + 'px';
+        overlay.style.width = ps.width + 'px';
+        overlay.style.height = ps.height + 'px';
+        overlay.dataset.placedId = ps.id;
+
+        overlay.innerHTML = `
+          <img src="${stamp.dataUrl}" draggable="false">
+          <div class="resize-handle"></div>
+          <div class="delete-handle">&times;</div>
+        `;
+
+        // Delete
+        overlay.querySelector('.delete-handle').addEventListener('click', (e) => {
+          e.stopPropagation();
+          placedStamps[currentPage] = placedStamps[currentPage].filter(p => p.id !== ps.id);
+          renderPlacedStamps();
+          updateSaveBtn();
+        });
+
+        // Drag
+        makeDraggable(overlay, ps);
+
+        // Resize
+        makeResizable(overlay, ps);
+
+        canvasWrapper.appendChild(overlay);
+      });
+    }
+
+    function makeDraggable(el, ps) {
+      let startX, startY, origX, origY;
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('resize-handle') || e.target.classList.contains('delete-handle')) return;
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        origX = ps.x;
+        origY = ps.y;
+
+        let moved = false;
+        const onMove = (e) => {
+          moved = true;
+          isDraggingOrResizing = true;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          ps.x = origX + dx;
+          ps.y = origY + dy;
+          el.style.left = ps.x + 'px';
+          el.style.top = ps.y + 'px';
+        };
+
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+
+      // Touch support
+      el.addEventListener('touchstart', (e) => {
+        if (e.target.classList.contains('resize-handle') || e.target.classList.contains('delete-handle')) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        origX = ps.x;
+        origY = ps.y;
+
+        const onMove = (e) => {
+          const touch = e.touches[0];
+          const dx = touch.clientX - startX;
+          const dy = touch.clientY - startY;
+          ps.x = origX + dx;
+          ps.y = origY + dy;
+          el.style.left = ps.x + 'px';
+          el.style.top = ps.y + 'px';
+        };
+
+        const onUp = () => {
+          document.removeEventListener('touchmove', onMove);
+          document.removeEventListener('touchend', onUp);
+        };
+
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+      }, { passive: false });
+    }
+
+    function makeResizable(el, ps) {
+      const handle = el.querySelector('.resize-handle');
+      let startX, startY, origW, origH;
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startX = e.clientX;
+        startY = e.clientY;
+        origW = ps.width;
+        origH = ps.height;
+
+        const onMove = (e) => {
+          isDraggingOrResizing = true;
+          const dx = e.clientX - startX;
+          const newSize = Math.max(20, origW + dx);
+          ps.width = newSize;
+          ps.height = newSize;
+          el.style.width = newSize + 'px';
+          el.style.height = newSize + 'px';
+        };
+
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+
+      handle.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        origW = ps.width;
+        origH = ps.height;
+
+        const onMove = (e) => {
+          const touch = e.touches[0];
+          const dx = touch.clientX - startX;
+          const newSize = Math.max(20, origW + dx);
+          ps.width = newSize;
+          ps.height = newSize;
+          el.style.width = newSize + 'px';
+          el.style.height = newSize + 'px';
+        };
+
+        const onUp = () => {
+          document.removeEventListener('touchmove', onMove);
+          document.removeEventListener('touchend', onUp);
+        };
+
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+      }, { passive: false });
+    }
+
+    function updateStampSize(val) {
+      stampSizeLabel.textContent = val + 'px';
+    }
+
+    function updateSaveBtn() {
+      const hasStamps = Object.values(placedStamps).some(arr => arr.length > 0);
+      saveBtn.disabled = !(pdfDoc && hasStamps);
+    }
+
+    // Save PDF
+    async function savePdf() {
+      showLoading('PDF 저장 중...');
+
+      try {
+        const applyAll = document.getElementById('applyAllPages').checked;
+
+        // Collect stamp data
+        const stampDataMap = {};
+        stamps.forEach(s => {
+          stampDataMap[s.id] = s.dataUrl;
+        });
+
+        // Build placement data: convert canvas coords to PDF coords
+        const placements = [];
+
+        if (applyAll) {
+          // Apply current page stamps to all pages
+          const currentStamps = placedStamps[currentPage] || [];
+          for (let page = 1; page <= totalPages; page++) {
+            const pageDim = pdfPageDimensions[page];
+            currentStamps.forEach(ps => {
+              // Convert from canvas coords to PDF coords
+              const pdfX = (ps.x / pdfCanvas.width) * pageDim.width;
+              const pdfY = pageDim.height - ((ps.y + ps.height) / pdfCanvas.height) * pageDim.height;
+              const pdfW = (ps.width / pdfCanvas.width) * pageDim.width;
+              const pdfH = (ps.height / pdfCanvas.height) * pageDim.height;
+
+              placements.push({
+                page,
+                stampId: ps.stampId,
+                x: pdfX,
+                y: pdfY,
+                width: pdfW,
+                height: pdfH
+              });
+            });
+          }
+        } else {
+          Object.entries(placedStamps).forEach(([page, stamps]) => {
+            const pageNum = parseInt(page);
+            const pageDim = pdfPageDimensions[pageNum];
+            stamps.forEach(ps => {
+              const pdfX = (ps.x / pdfCanvas.width) * pageDim.width;
+              const pdfY = pageDim.height - ((ps.y + ps.height) / pdfCanvas.height) * pageDim.height;
+              const pdfW = (ps.width / pdfCanvas.width) * pageDim.width;
+              const pdfH = (ps.height / pdfCanvas.height) * pageDim.height;
+
+              placements.push({
+                page: pageNum,
+                stampId: ps.stampId,
+                x: pdfX,
+                y: pdfY,
+                width: pdfW,
+                height: pdfH
+              });
+            });
+          });
+        }
+
+        // Send to server
+        const formData = new FormData();
+        formData.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }), 'input.pdf');
+
+        // Append stamp images
+        const usedStampIds = [...new Set(placements.map(p => p.stampId))];
+        for (const stampId of usedStampIds) {
+          const dataUrl = stampDataMap[stampId];
+          const response = await fetch(dataUrl);
+          const blob = await response.blob();
+          formData.append(`stamp_${stampId}`, blob, `stamp_${stampId}.png`);
+        }
+
+        formData.append('placements', JSON.stringify(placements));
+
+        const res = await fetch('/api/save', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err);
+        }
+
+        const resultBlob = await res.blob();
+        const url = URL.createObjectURL(resultBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'signed_' + (document.getElementById('pdfFileName').textContent || 'document.pdf');
+        a.click();
+        URL.revokeObjectURL(url);
+
+        hideLoading();
+        showToast('PDF 저장 완료!');
+      } catch (err) {
+        hideLoading();
+        showToast('저장 실패: ' + err.message);
+        console.error(err);
+      }
+    }
+
+    // Drag & drop on upload boxes
+    ['pdfUploadBox', 'stampUploadBox'].forEach(id => {
+      const box = document.getElementById(id);
+      box.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        box.style.borderColor = '#1a73e8';
+        box.style.background = '#f0f6ff';
+      });
+      box.addEventListener('dragleave', () => {
+        box.style.borderColor = '';
+        box.style.background = '';
+      });
+      box.addEventListener('drop', (e) => {
+        e.preventDefault();
+        box.style.borderColor = '';
+        box.style.background = '';
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+
+        if (id === 'pdfUploadBox' && file.type === 'application/pdf') {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          pdfInput.files = dt.files;
+          pdfInput.dispatchEvent(new Event('change'));
+        } else if (id === 'stampUploadBox' && file.type.startsWith('image/')) {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          stampInput.files = dt.files;
+          stampInput.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+
+    // Utilities
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text || '처리 중...';
+      document.getElementById('loading').classList.add('show');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').classList.remove('show');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>
