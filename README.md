@@ -31,6 +31,9 @@ npm start
 
 브라우저가 자동으로 열립니다.
 
+> **macOS 보안 경고 해결**: 처음 실행 시 "malware" 경고가 나올 수 있습니다.
+> `PDF서명.command` 파일을 **우클릭 > 열기**로 실행하면 "열기" 버튼이 나타납니다. 한 번만 허용하면 이후에는 더블클릭으로 실행됩니다.
+
 ## 기술 스택
 
 - **Frontend**: Vanilla JS, [PDF.js](https://mozilla.github.io/pdf.js/)
